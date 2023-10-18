@@ -1,0 +1,87 @@
+<form version="1.1" script="common.js,users_watchlist_bulk_add.js" stylesheet="users_watchlist.css">
+  <label>Users Watchlist - Bulk add</label>
+  <search id="createSearch" depends="$atok_users$, $atok_risk$, $atok_expire$, $atok_monitor$, $atok_reason$">
+  <query>
+    | inputlookup users_watchlist
+    | append [stats count
+      | eval user="$atok_users$"
+      | eval creator="$env:user$"
+      | eval created=now()
+      | eval risk="$atok_risk$"
+      | eval expire="$atok_expire$"
+      | eval monitor="$atok_monitor$"
+      | eval reason="$atok_reason$"
+      | makemv delim="|" user |  mvexpand user ]
+    | table user, creator, created, risk, expire, monitor, reason
+    | outputlookup users_watchlist
+  </query>
+</search>
+<search id="auditSearch" depends="$atok_action_audit$, $atok_users$, $atok_risk$, $atok_expire$, $atok_monitor$, $atok_reason$">
+  <query>
+  | makeresults
+  | eval _time=now()
+  | eval action="create"
+  | eval user="$env:user$"
+  | eval user="$atok_users$"
+  | eval risk="$atok_risk$"
+  | eval expire="$atok_expire$"
+  | eval monitor="$atok_monitor$"
+  | eval reason="$atok_reason$"
+  | makemv delim="|" user |  mvexpand user
+  | collect index=`users_watchlist_index` source="users_watchlist" sourcetype=`users_watchlist_sourcetype`
+  </query>
+</search>
+  <row>
+    <panel id="UsersFormPanel">
+      <html>
+        <div id="progress"></div>
+        <form>
+          <div>
+            <p><a href="users_watchlist" class="btn btn-info">Go back</a></p>
+            <p class="box-success">Successfully added</p>
+          </div>
+          <div>
+          	<label for="tok_user">Users</label>
+          	<textarea style="width: 95%" name="tok_users" rows="5"/>
+          </div>
+          <div>
+          	<label for="tok_risk">Risk level</label>
+            <select style="width: 95%" name="tok_risk">
+              <option value="0">None</option>
+              <option value="1">Low</option>
+              <option value="2">Medium</option>
+              <option value="3">High</option>
+              <option value="4">Critical</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_expire">Expire</label>
+            <select style="width: 95%" name="tok_expire">
+              <option value="1">1 month</option>
+              <option value="3">3 months</option>
+              <option value="6">6 months</option>
+              <option value="9">9 months</option>
+              <option value="12">1 year</option>
+              <option value="0">Never</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_monitor">Monitor</label>
+            <select style="width: 95%" name="tok_monitor">
+              <option value="true">True</option>
+              <option value="false">False</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_reason">Reason</label>
+          	<textarea style="width: 95%" name="tok_reason" rows="5"/>
+          </div>
+          <div>
+            <button id="submitButton" class="btn btn-primary">Submit</button>
+            <button id="clearButton" class="btn btn-warning">Clear</button>
+          </div>
+        </form>
+      </html>
+    </panel>
+  </row>
+</form>

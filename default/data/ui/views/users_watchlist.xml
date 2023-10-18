@@ -1,0 +1,156 @@
+<form version="1.1" script="common.js,users_watchlist.js" stylesheet="users_watchlist.css">
+  <label>Users Watchlist</label>
+  <search id="updateSearch" depends="$atok_action_update$, $atok_user$, $atok_risk$, $atok_expire$, $atok_monitor$, $atok_reason$, $atok_key$">
+    <query>
+      | inputlookup users_watchlist | eval key=_key | WHERE key="$atok_key$"
+      | eval user="$atok_user$"
+      | eval creator="$env:user$"
+      | eval created=now()
+      | eval risk="$atok_risk$"
+      | eval expire="$atok_expire$"
+      | eval monitor="$atok_monitor$"
+      | eval reason="$atok_reason$"
+      | outputlookup users_watchlist append=t
+    </query>
+  </search>
+  <search id="createSearch" depends="$atok_action_create$, $atok_user$, $atok_risk$, $atok_expire$, $atok_monitor$, $atok_reason$">
+    <query>
+      | inputlookup users_watchlist
+      | append [stats count
+        | eval user="$atok_user$"
+        | eval creator="$env:user$"
+        | eval created=now()
+        | eval risk="$atok_risk$"
+        | eval expire="$atok_expire$"
+        | eval monitor="$atok_monitor$"
+        | eval reason="$atok_reason$" ]
+      | table user, creator, created, risk, expire, monitor, reason
+      | outputlookup users_watchlist
+    </query>
+  </search>
+  <search id="deleteSearch" depends="$atok_action_delete$, $atok_key$">
+    <query>
+      | inputlookup users_watchlist | eval key=_key | WHERE NOT key="$atok_key$" | outputlookup users_watchlist
+    </query>
+  </search>
+  <search id="auditSearch" depends="$atok_action_audit$, $atok_action$, $atok_user$, $atok_risk$, $atok_expire$, $atok_monitor$, $atok_reason$">
+    <query>
+    | makeresults
+    | eval _time=now()
+    | eval action="$atok_action$"
+    | eval user="$env:user$"
+    | eval user="$atok_user$"
+    | eval risk="$atok_risk$"
+    | eval expire="$atok_expire$"
+    | eval monitor="$atok_monitor$"
+    | eval reason="$atok_reason$"
+    | collect index=`users_watchlist_index` source="users_watchlist" sourcetype=`users_watchlist_sourcetype`
+    </query>
+  </search>
+  <fieldset submitButton="true" autoRun="false">
+    <input type="text" token="stok_user">
+      <label>User</label>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="stok_creator">
+      <label>Creator</label>
+      <choice value="*">*</choice>
+      <default>*</default>
+      <fieldForLabel>creator</fieldForLabel>
+      <fieldForValue>creator</fieldForValue>
+      <search>
+        <query>| inputlookup users_watchlist | dedup creator | table creator</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+    </input>
+    <input type="text" token="stok_monitor" searchWhenChanged="true">
+      <label>Monitor</label>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel id="UsersPanel">
+      <title>Currently monitored Userss</title>
+      <table id="UsersTable">
+        <search id="UsersSearch">
+          <query>
+            | inputlookup users_watchlist WHERE user="$stok_user$" creator="$stok_creator$" monitor=$stok_monitor$
+            | rename _key as key
+            | sort -created
+            | table user, creator, created, risk, expire, monitor, reason, key
+            | convert timeformat="%Y-%m-%d %H:%M:%S" ctime(created)
+            | eval expire=case(expire=="1", "1 month", expire=="3", "3 months", expire=="6", "6 months", expire=="9", "9 months", expire=="12", "1 year", 1==1, "Never")
+            | eval risk=case(risk==4, "Critical", risk==3, "High", risk==2, "Medium", risk==1, "Low", 1==1, "None")
+          </query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel id="UsersFormPanel">
+      <html>
+        <div id="progress"></div>
+        <form>
+          <div>
+            <p><a href="users_watchlist_bulk_add" class="btn btn-info">Bulk add</a></p>
+          </div>
+          <div>
+          	<label for="tok_uid">Key</label>
+          	<input style="width: 95%" type="text" name="tok_key" readonly="readonly"/>
+          </div>
+          <div>
+          	<label for="tok_user">User</label>
+          	<input style="width: 95%" type="text" name="tok_user" value="$tok_user|h$"/>
+          </div>
+          <div>
+          	<label for="tok_risk">Risk level</label>
+            <select style="width: 95%" name="tok_risk">
+              <option value="0">None</option>
+              <option value="1">Low</option>
+              <option value="2">Medium</option>
+              <option value="3">High</option>
+              <option value="4">Critical</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_expire">Expire</label>
+            <select style="width: 95%" name="tok_expire">
+              <option value="1">1 month</option>
+              <option value="3">3 months</option>
+              <option value="6">6 months</option>
+              <option value="9">9 months</option>
+              <option value="12">1 year</option>
+              <option value="0">Never</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_monitor">Monitor</label>
+            <select style="width: 95%" name="tok_monitor">
+              <option value="true">True</option>
+              <option value="false">False</option>
+            </select>
+          </div>
+          <div>
+          	<label for="tok_reason">Reason</label>
+          	<textarea style="width: 95%" name="tok_reason" rows="5"/>
+          </div>
+          <div>
+            <button id="submitButton" class="btn btn-primary">Submit</button>
+            <button id="deleteButton" class="btn btn-danger">Delete</button>
+            <button id="clearButton" class="btn btn-warning">Clear</button>
+          </div>
+        </form>
+      </html>
+    </panel>
+  </row>
+</form>
